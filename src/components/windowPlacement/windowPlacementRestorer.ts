@@ -1,4 +1,4 @@
-import { GLib, Meta } from '../../gi/ext';
+import { GLib, Meta, Mtk } from '../../gi/ext';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import SignalHandling from '../../utils/signalHandling';
 import Settings from '../../settings/settings';
@@ -15,8 +15,10 @@ const RECORD_DELAY_MS = 1000;
 // how long to wait after a monitors change before restoring, so that
 // mutter has finished relocating the windows on its own
 const RESTORE_DELAY_MS = 1500;
-// relative difference under which two placements are considered equal
-const PLACEMENT_TOLERANCE = 0.005;
+// difference in pixels under which two placements are considered equal.
+// It must be small: after a monitor is reconnected, mutter often puts the
+// windows back just a few pixels away from where they were
+const PLACEMENT_TOLERANCE_PX = 2;
 
 interface WindowPlacement {
     monitorKey: string;
@@ -354,7 +356,9 @@ export class WindowPlacementRestorer {
         if (monitorIndex < 0) return;
 
         const current = this._currentPlacement(window);
-        if (current && this._samePlacement(current, placement)) return;
+        const workArea = Main.layoutManager.getWorkAreaForMonitor(monitorIndex);
+        if (current && this._samePlacement(current, placement, workArea))
+            return;
 
         debug(
             `restoring "${window.get_title()}" on monitor ${monitorIndex} (${placement.monitorKey})`,
@@ -382,7 +386,6 @@ export class WindowPlacementRestorer {
             return;
         }
 
-        const workArea = Main.layoutManager.getWorkAreaForMonitor(monitorIndex);
         window.move_to_monitor(monitorIndex);
         window.move_resize_frame(
             false,
@@ -393,16 +396,22 @@ export class WindowPlacementRestorer {
         );
     }
 
-    private _samePlacement(a: WindowPlacement, b: WindowPlacement): boolean {
+    private _samePlacement(
+        a: WindowPlacement,
+        b: WindowPlacement,
+        workArea: Mtk.Rectangle,
+    ): boolean {
         if (a.monitorKey !== b.monitorKey) return false;
         if (a.maximized !== b.maximized || a.fullscreen !== b.fullscreen)
             return false;
         if (a.maximized || a.fullscreen) return true;
         return (
-            Math.abs(a.x - b.x) < PLACEMENT_TOLERANCE &&
-            Math.abs(a.y - b.y) < PLACEMENT_TOLERANCE &&
-            Math.abs(a.width - b.width) < PLACEMENT_TOLERANCE &&
-            Math.abs(a.height - b.height) < PLACEMENT_TOLERANCE
+            Math.abs(a.x - b.x) * workArea.width <= PLACEMENT_TOLERANCE_PX &&
+            Math.abs(a.y - b.y) * workArea.height <= PLACEMENT_TOLERANCE_PX &&
+            Math.abs(a.width - b.width) * workArea.width <=
+                PLACEMENT_TOLERANCE_PX &&
+            Math.abs(a.height - b.height) * workArea.height <=
+                PLACEMENT_TOLERANCE_PX
         );
     }
 
