@@ -79,6 +79,7 @@ export class TilingManager {
     private _wasSpanMultipleTilesActivated: boolean;
     private _wasTilingSystemActivated: boolean;
     private _snapAssistingInfo: SnapAssistingInfo;
+    private _snapAssistSelectedLayout: Layout | undefined;
 
     private _movingWindowTimerId: number | null = null;
 
@@ -166,6 +167,7 @@ export class TilingManager {
      *  - handle grabbed window's movement.
      */
     public enable() {
+        this._updateSnapAssistLayouts();
         this._signals.connect(
             Settings,
             Settings.KEY_SETTING_SELECTED_LAYOUTS,
@@ -192,6 +194,20 @@ export class TilingManager {
                     ws.index(),
                 );
                 this._workspaceTilingLayout.get(ws)?.relayout({ layout });
+            },
+        );
+        this._signals.connect(
+            GlobalState.get(),
+            GlobalState.SIGNAL_ADJUSTED_LAYOUTS_CHANGED,
+            () => {
+                this._workspaceTilingLayout.forEach((tilingLayout, ws) => {
+                    const layout = GlobalState.get().getSelectedLayoutOfMonitor(
+                        this._monitor.index,
+                        ws.index(),
+                    );
+                    tilingLayout.relayout({ layout });
+                });
+                this._updateSnapAssistLayouts();
             },
         );
 
@@ -243,6 +259,7 @@ export class TilingManager {
             global.workspaceManager,
             'active-workspace-changed',
             () => {
+                this._updateSnapAssistLayouts();
                 const ws = global.workspaceManager.get_active_workspace();
                 if (this._workspaceTilingLayout.has(ws)) return;
 
@@ -920,10 +937,17 @@ export class TilingManager {
         )
             return;
 
+        const selectedLayout = GlobalState.get().getSelectedLayoutOfMonitor(
+            this._monitor.index,
+            global.workspaceManager.get_active_workspace_index(),
+        );
+        // prefer the selected layout, it may have adjusted tiles
         const wasSnapAssistingLayout = this._snapAssistingInfo.isSnapAssisting
-            ? GlobalState.get().layouts.find(
-                  (lay) => lay.id === this._snapAssistingInfo.layoutId,
-              )
+            ? selectedLayout.id === this._snapAssistingInfo.layoutId
+                ? selectedLayout
+                : GlobalState.get().layouts.find(
+                      (lay) => lay.id === this._snapAssistingInfo.layoutId,
+                  )
             : undefined;
 
         // disable snap assistance
@@ -967,7 +991,12 @@ export class TilingManager {
         this._easeWindowRect(window, desiredWindowRect);
 
         // Sync the desktop layout to match the snap-assisted layout if enabled
-        if (wasSnapAssistingLayout && Settings.SNAP_ASSIST_SYNC_LAYOUT) {
+        // selecting the same layout again would discard its adjusted tiles
+        if (
+            wasSnapAssistingLayout &&
+            Settings.SNAP_ASSIST_SYNC_LAYOUT &&
+            wasSnapAssistingLayout.id !== selectedLayout.id
+        ) {
             GlobalState.get().setSelectedLayoutOfMonitor(
                 wasSnapAssistingLayout.id,
                 this._monitor.index,
@@ -1090,6 +1119,22 @@ export class TilingManager {
             destRect.y,
             destRect.width,
             destRect.height,
+        );
+    }
+
+    // show the adjusted tiles of the selected layout in the snap assistant
+    private _updateSnapAssistLayouts() {
+        const selectedLayout = GlobalState.get().getSelectedLayoutOfMonitor(
+            this._monitor.index,
+            global.workspaceManager.get_active_workspace_index(),
+        );
+        if (this._snapAssistSelectedLayout === selectedLayout) return;
+
+        this._snapAssistSelectedLayout = selectedLayout;
+        this._snapAssist.setLayouts(
+            GlobalState.get().layouts.map((lay) =>
+                lay.id === selectedLayout.id ? selectedLayout : lay,
+            ),
         );
     }
 
