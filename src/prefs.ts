@@ -334,6 +334,15 @@ export default class TilingShellExtensionPreferences extends ExtensionPreference
         );
         behaviourGroup.add(raiseTogetherCurrentMonitorRow);
 
+        const restoreWindowPlacementRow = this._buildSwitchRow(
+            Settings.KEY_RESTORE_WINDOW_PLACEMENT,
+            _('Restore window placement when a display reconnects'),
+            _(
+                'When a display is turned off and on again, move its windows back to their previous position, size and tile',
+            ),
+        );
+        behaviourGroup.add(restoreWindowPlacementRow);
+
         const syncLayoutRow = this._buildSwitchRow(
             Settings.KEY_SYNC_LAYOUT_ACROSS_WORKSPACES,
             _('Sync layout across workspaces'),

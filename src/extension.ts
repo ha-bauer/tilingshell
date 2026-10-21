@@ -52,6 +52,7 @@ import { LayoutSwitcherPopup } from './components/layoutSwitcher/layoutSwitcher'
 import { unmaximizeWindow } from './utils/gnomesupport';
 import * as Config from 'resource:///org/gnome/shell/misc/config.js';
 import { RaiseTogetherManager } from './components/raiseTogether/raiseTogetherManager';
+import { WindowPlacementRestorer } from './components/windowPlacement/windowPlacementRestorer';
 
 const debug = logger('extension');
 
@@ -65,6 +66,7 @@ export default class TilingShellExtension extends Extension {
     private _resizingManager: ResizingManager | null;
     private _windowBorderManager: WindowBorderManager | null;
     private _raiseTogetherManager: RaiseTogetherManager | null;
+    private _windowPlacementRestorer: WindowPlacementRestorer | null;
 
     constructor(metadata: ExtensionMetadata) {
         super(metadata);
@@ -77,6 +79,7 @@ export default class TilingShellExtension extends Extension {
         this._resizingManager = null;
         this._windowBorderManager = null;
         this._raiseTogetherManager = null;
+        this._windowPlacementRestorer = null;
     }
 
     createIndicator() {
@@ -174,6 +177,11 @@ export default class TilingShellExtension extends Extension {
 
         this._raiseTogetherManager = new RaiseTogetherManager();
         this._raiseTogetherManager.enable();
+
+        this._windowPlacementRestorer = new WindowPlacementRestorer(
+            (monitorIndex) => this._tilingManagers[monitorIndex],
+        );
+        this._windowPlacementRestorer.enable();
 
         this.createIndicator();
 
@@ -799,6 +807,9 @@ export default class TilingShellExtension extends Extension {
 
         this._raiseTogetherManager?.destroy();
         this._raiseTogetherManager = null;
+
+        this._windowPlacementRestorer?.destroy();
+        this._windowPlacementRestorer = null;
 
         // disable dbus
         this._dbus?.disable();

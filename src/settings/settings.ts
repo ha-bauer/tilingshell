@@ -106,6 +106,7 @@ export default class Settings {
     static KEY_RAISE_TOGETHER = 'raise-together';
     static KEY_RAISE_TOGETHER_CURRENT_MONITOR_ONLY =
         'raise-together-current-monitor-only';
+    static KEY_RESTORE_WINDOW_PLACEMENT = 'restore-window-placement';
     static KEY_ACTIVE_SCREEN_EDGES = 'active-screen-edges';
     static KEY_TOP_EDGE_MAXIMIZE = 'top-edge-maximize';
     static KEY_OVERRIDE_WINDOW_MENU = 'override-window-menu';
@@ -360,6 +361,14 @@ export default class Settings {
 
     static set RAISE_TOGETHER_CURRENT_MONITOR_ONLY(val: boolean) {
         set_boolean(Settings.KEY_RAISE_TOGETHER_CURRENT_MONITOR_ONLY, val);
+    }
+
+    static get RESTORE_WINDOW_PLACEMENT(): boolean {
+        return get_boolean(Settings.KEY_RESTORE_WINDOW_PLACEMENT);
+    }
+
+    static set RESTORE_WINDOW_PLACEMENT(val: boolean) {
+        set_boolean(Settings.KEY_RESTORE_WINDOW_PLACEMENT, val);
     }
 
     static get ACTIVE_SCREEN_EDGES(): boolean {

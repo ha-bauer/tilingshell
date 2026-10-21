@@ -1336,6 +1336,10 @@ export class TilingManager {
         this._easeWindowRectFromTile(tile, window);
     }
 
+    public onRestoreWindowToTile(tile: Tile, window: Meta.Window) {
+        this._easeWindowRectFromTile(tile, window);
+    }
+
     public onSpanAllTiles(window: Meta.Window) {
         this._easeWindowRectFromTile(
             new Tile({
