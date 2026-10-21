@@ -16,7 +16,7 @@ export default class EditableTilePreview extends TilePreview {
         GTypeName: 'EditableTilePreview',
     })};
 
-    public static MIN_TILE_SIZE: number = 140;
+    public static MIN_TILE_SIZE: number = 80;
 
     private readonly _btn: St.Button;
     private readonly _containerRect: Mtk.Rectangle;
