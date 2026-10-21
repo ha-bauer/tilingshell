@@ -231,6 +231,8 @@ class SnapAssistContent extends St.BoxLayout {
     private _setLayouts(layouts: Layout[]) {
         this._snapAssistLayouts.forEach((lay) => lay.destroy());
         this.remove_all_children();
+        // the hovered tile was destroyed together with its layout
+        this._hoveredInfo = undefined;
 
         const [, scalingFactor] = getScalingFactorOf(this);
 
