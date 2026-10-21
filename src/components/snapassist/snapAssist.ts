@@ -224,9 +224,15 @@ class SnapAssistContent extends St.BoxLayout {
         });
     }
 
+    public setLayouts(layouts: Layout[]) {
+        this._setLayouts(layouts);
+    }
+
     private _setLayouts(layouts: Layout[]) {
         this._snapAssistLayouts.forEach((lay) => lay.destroy());
         this.remove_all_children();
+        // the hovered tile was destroyed together with its layout
+        this._hoveredInfo = undefined;
 
         const [, scalingFactor] = getScalingFactorOf(this);
 
@@ -424,5 +430,9 @@ export default class SnapAssist extends St.Widget {
 
     public close(ease: boolean = false) {
         this._content.close(ease);
+    }
+
+    public setLayouts(layouts: Layout[]) {
+        this._content.setLayouts(layouts);
     }
 }

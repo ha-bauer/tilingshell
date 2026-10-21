@@ -17,6 +17,9 @@ export default class GlobalState extends GObject.Object {
             'layouts-changed': {
                 param_types: [],
             },
+            'adjusted-layouts-changed': {
+                param_types: [],
+            },
         },
         Properties: {
             tilePreviewAnimationTime: GObject.ParamSpec.uint(
@@ -32,6 +35,7 @@ export default class GlobalState extends GObject.Object {
     })};
 
     public static SIGNAL_LAYOUTS_CHANGED = 'layouts-changed';
+    public static SIGNAL_ADJUSTED_LAYOUTS_CHANGED = 'adjusted-layouts-changed';
 
     private static _instance: GlobalState | null;
 
@@ -41,6 +45,9 @@ export default class GlobalState extends GObject.Object {
     // if workspaces are reordered, we use this map to know which layouts where selected
     // to each workspace and we save the new ordering in the settings
     private _selected_layouts: Map<Meta.Workspace, string[]>; // used to handle reordering of workspaces
+    // runtime-only copies of the selected layouts whose tile borders were moved
+    // by resizing tiled windows together, keyed by "monitorIndex:workspaceIndex"
+    private _adjustedLayouts: Map<string, Layout>;
 
     static get(): GlobalState {
         if (!this._instance) this._instance = new GlobalState();
@@ -63,6 +70,7 @@ export default class GlobalState extends GObject.Object {
         this._layouts = Settings.get_layouts_json();
         this._tilePreviewAnimationTime = 100;
         this._selected_layouts = new Map();
+        this._adjustedLayouts = new Map();
         this.validate_selected_layouts();
 
         Settings.bind(
@@ -76,6 +84,7 @@ export default class GlobalState extends GObject.Object {
             Settings.KEY_SETTING_LAYOUTS_JSON,
             () => {
                 this._layouts = Settings.get_layouts_json();
+                this._adjustedLayouts.clear();
                 this.emit(GlobalState.SIGNAL_LAYOUTS_CHANGED);
             },
         );
@@ -183,6 +192,7 @@ export default class GlobalState extends GObject.Object {
 
                 this._selected_layouts.clear();
                 this._selected_layouts = newMap;
+                this._clearAdjustedLayouts();
                 debug('deleted workspace');
             },
         );
@@ -191,6 +201,7 @@ export default class GlobalState extends GObject.Object {
             global.workspaceManager,
             'workspaces-reordered',
             () => {
+                this._clearAdjustedLayouts();
                 this._save_selected_layouts();
                 debug('reordered workspaces');
             },
@@ -293,8 +304,37 @@ export default class GlobalState extends GObject.Object {
 
     set layouts(layouts: Layout[]) {
         this._layouts = layouts;
+        this._adjustedLayouts.clear();
         Settings.save_layouts_json(layouts);
         this.emit(GlobalState.SIGNAL_LAYOUTS_CHANGED);
+    }
+
+    /**
+     * Stores a copy of the selected layout of the given monitor and workspace
+     * whose tiles were adjusted at runtime (e.g. by resizing tiled windows
+     * together). It is returned by getSelectedLayoutOfMonitor until another
+     * layout is selected or the layouts are edited.
+     */
+    public setAdjustedLayoutOfMonitor(
+        layout: Layout,
+        monitorIndex: number,
+        workspaceIndex: number,
+    ) {
+        this._adjustedLayouts.set(`${monitorIndex}:${workspaceIndex}`, layout);
+        this.emit(GlobalState.SIGNAL_ADJUSTED_LAYOUTS_CHANGED);
+    }
+
+    private _clearAdjustedLayouts(monitorIndex?: number) {
+        if (this._adjustedLayouts.size === 0) return;
+
+        if (monitorIndex === undefined) {
+            this._adjustedLayouts.clear();
+        } else {
+            [...this._adjustedLayouts.keys()]
+                .filter((key) => key.startsWith(`${monitorIndex}:`))
+                .forEach((key) => this._adjustedLayouts.delete(key));
+        }
+        this.emit(GlobalState.SIGNAL_ADJUSTED_LAYOUTS_CHANGED);
     }
 
     public getSelectedLayoutOfMonitor(
@@ -312,11 +352,16 @@ export default class GlobalState extends GObject.Object {
         if (monitorIndex < 0 || monitorIndex >= monitors_selected.length)
             monitorIndex = 0;
 
-        return (
+        const selectedLayout =
             this._layouts.find(
                 (lay) => lay.id === monitors_selected[monitorIndex],
-            ) || this._layouts[0]
+            ) || this._layouts[0];
+        const adjustedLayout = this._adjustedLayouts.get(
+            `${monitorIndex}:${workspaceIndex}`,
         );
+        return adjustedLayout && adjustedLayout.id === selectedLayout.id
+            ? adjustedLayout
+            : selectedLayout;
     }
 
     public get tilePreviewAnimationTime(): number {
@@ -331,6 +376,9 @@ export default class GlobalState extends GObject.Object {
         layoutToSelectId: string,
         monitorIndex: number,
     ) {
+        // selecting a layout (even the same one again) restores its original tiles
+        this._clearAdjustedLayouts(monitorIndex);
+
         const selected = Settings.get_selected_layouts();
 
         if (Settings.SYNC_LAYOUT_ACROSS_WORKSPACES) {
